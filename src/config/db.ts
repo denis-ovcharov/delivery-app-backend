@@ -5,10 +5,15 @@ dotenv.config();
 
 const connectDB = async (): Promise<void> => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI!);
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    const mongoConnectionString = process.env.MONGODB_URL ?? process.env.MONGODB_URI;
+    if (!mongoConnectionString) {
+      throw new Error("MongoDB connection string is missing. Set MONGODB_URL or MONGODB_URI.");
+    }
+
+    const connection = await mongoose.connect(mongoConnectionString);
+    console.log(`MongoDB Connected: ${connection.connection.host}`);
   } catch (error) {
-    console.error(`❌ Error: ${(error as Error).message}`);
+    console.error(`Error: ${(error as Error).message}`);
     process.exit(1);
   }
 };

@@ -116,9 +116,10 @@ delivery-app/
 1. Connect GitHub repository
 2. Set environment variables:
    - `PORT`
-   - `MONGODB_URI`
+   - `MONGODB_URL` (or `MONGODB_URI`)
    - `JWT_SECRET`
    - `JWT_EXPIRES_IN`
+   - `CORS_ORIGIN` (comma-separated allowed origins in production)
 
 ### Frontend (Vercel)
 1. Import project

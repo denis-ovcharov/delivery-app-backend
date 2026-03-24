@@ -1,9 +1,11 @@
 import Joi from 'joi';
 
+const objectIdSchema = Joi.string().hex().length(24);
+
 const orderItemSchema = Joi.object({
-  product: Joi.string().required(),
-  name: Joi.string().required(),
-  price: Joi.number().min(0).required(),
+  product: objectIdSchema.required(),
+  name: Joi.string().optional(),
+  price: Joi.number().min(0).optional(),
   quantity: Joi.number().integer().min(1).required()
 });
 
@@ -21,7 +23,7 @@ export const getOrdersSchema = {
   query: Joi.object({
     email: Joi.string().email().optional(),
     phone: Joi.string().optional(),
-    orderId: Joi.string().optional(),
+    orderId: objectIdSchema.optional(),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(50).default(10)
   })
@@ -29,12 +31,12 @@ export const getOrdersSchema = {
 
 export const getOrderByIdSchema = {
   params: Joi.object({
-    id: Joi.string().required()
+    id: objectIdSchema.required()
   })
 };
 
 export const reorderSchema = {
   params: Joi.object({
-    id: Joi.string().required()
+    id: objectIdSchema.required()
   })
 };

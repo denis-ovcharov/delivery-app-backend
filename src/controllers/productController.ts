@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Product } from '../models';
+import { escapeRegExp } from '../utils/string';
 
 export const getProducts = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -24,7 +25,7 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     }
 
     if (search) {
-      filter.name = { $regex: search, $options: 'i' };
+      filter.name = { $regex: escapeRegExp(String(search)), $options: 'i' };
     }
 
     const sort: Record<string, 1 | -1> = { [sortBy as string]: sortOrder === 'asc' ? 1 : -1 };

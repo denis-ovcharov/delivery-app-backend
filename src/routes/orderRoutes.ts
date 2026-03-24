@@ -8,7 +8,7 @@ const router = Router();
 
 router.post('/', auth, celebrate(createOrderSchema), createOrder);
 router.get('/', auth, celebrate(getOrdersSchema), getOrders);
-router.get('/:id', celebrate(getOrderByIdSchema), getOrderById);
+router.get('/:id', auth, celebrate(getOrderByIdSchema), getOrderById);
 router.post('/:id/reorder', auth, celebrate(reorderSchema), reorder);
 
 export default router;
