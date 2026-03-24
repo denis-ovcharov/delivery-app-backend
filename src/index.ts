@@ -15,8 +15,8 @@ if (!process.env.JWT_SECRET) {
   missingEnvVars.push("JWT_SECRET");
 }
 
-if (!process.env.MONGODB_URL && !process.env.MONGODB_URI) {
-  missingEnvVars.push("MONGODB_URL or MONGODB_URI");
+if (!process.env.MONGODB_URL) {
+  missingEnvVars.push("MONGODB_URL");
 }
 
 if (missingEnvVars.length > 0) {

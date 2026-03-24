@@ -10,7 +10,8 @@
     "test": "npm run build && node --test tests/**/*.test.js",
     "check": "npm run lint && npm run test",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "push": "git add . && git commit -m 'update' && git push"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

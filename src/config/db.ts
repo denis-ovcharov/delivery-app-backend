@@ -5,9 +5,9 @@ dotenv.config();
 
 const connectDB = async (): Promise<void> => {
   try {
-    const mongoConnectionString = process.env.MONGODB_URL ?? process.env.MONGODB_URI;
+    const mongoConnectionString = process.env.MONGODB_URL;
     if (!mongoConnectionString) {
-      throw new Error("MongoDB connection string is missing. Set MONGODB_URL or MONGODB_URI.");
+      throw new Error("MongoDB connection string is missing. Set MONGODB_URL.");
     }
 
     const connection = await mongoose.connect(mongoConnectionString);
