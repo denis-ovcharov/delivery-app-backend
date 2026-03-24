@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { errorHandler } from "./middleware/errorHandler";
 import routes from "./routes";
 import connectDB from "./config/db";
+import { normalizeOrigin } from "./utils/string";
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => normalizeOrigin(origin))
   .filter(Boolean);
 
 const corsOptions: CorsOptions = {
@@ -37,6 +38,8 @@ const corsOptions: CorsOptions = {
       callback(null, true);
       return;
     }
+
+    const normalizedOrigin = normalizeOrigin(origin);
 
     if (allowedOrigins.length === 0) {
       if (process.env.NODE_ENV === "production") {
@@ -48,7 +51,7 @@ const corsOptions: CorsOptions = {
       return;
     }
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
       return;
     }

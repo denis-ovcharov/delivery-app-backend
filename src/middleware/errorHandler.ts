@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { CelebrateError } from 'celebrate';
+import { CelebrateError, isCelebrateError } from 'celebrate';
 
 export const errorHandler = (
   err: Error,
@@ -9,14 +9,18 @@ export const errorHandler = (
 ): void => {
   console.error('Error:', err);
 
-  if (err instanceof CelebrateError) {
+  if (isCelebrateError(err) || err instanceof CelebrateError) {
     const details: { field: string; message: string }[] = [];
-    err.details.forEach((value: any) => {
-      details.push({
-        field: value.path?.join('.') || 'unknown',
-        message: value.message || 'Validation error'
+
+    (err as CelebrateError).details.forEach((validationError, segment) => {
+      validationError.details.forEach((detail) => {
+        details.push({
+          field: detail.path.join('.') || detail.context?.key || String(segment) || 'unknown',
+          message: detail.message || 'Validation error'
+        });
       });
     });
+
     res.status(400).json({ error: 'Validation error', details });
     return;
   }

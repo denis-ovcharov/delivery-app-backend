@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Response } from 'express';
 import { Order, Coupon, Product } from '../models';
 import { AuthRequest } from '../middleware/auth';
@@ -15,7 +16,19 @@ interface CreateOrderBody {
   couponCode?: string;
 }
 
+interface HttpError extends Error {
+  statusCode?: number;
+}
+
+const createHttpError = (statusCode: number, message: string): HttpError => {
+  const error = new Error(message) as HttpError;
+  error.statusCode = statusCode;
+  return error;
+};
+
 export const createOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  const session = await mongoose.startSession();
+
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -24,113 +37,121 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const { items, email, phone, address, couponCode } = req.body as CreateOrderBody;
-    const uniqueProductIds = [...new Set(items.map((item) => item.product))];
-    const products = await Product.find({ _id: { $in: uniqueProductIds } }).select('_id name price');
+    let createdOrder = null;
 
-    if (products.length !== uniqueProductIds.length) {
-      res.status(400).json({ error: 'One or more products do not exist' });
-      return;
-    }
+    await session.withTransaction(async () => {
+      const uniqueProductIds = [...new Set(items.map((item) => item.product))];
+      const products = await Product.find({ _id: { $in: uniqueProductIds } })
+        .select('_id name price')
+        .session(session);
 
-    const productMap = new Map(products.map((product) => [product._id.toString(), product]));
-    const orderItems = items.map((item) => {
-      const product = productMap.get(item.product);
-      if (!product) {
-        throw new Error(`Product not found: ${item.product}`);
+      if (products.length !== uniqueProductIds.length) {
+        throw createHttpError(400, 'One or more products do not exist');
       }
 
-      return {
-        product: product._id,
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity
-      };
-    });
+      const productMap = new Map(products.map((product) => [product._id.toString(), product]));
+      const orderItems = items.map((item) => {
+        const product = productMap.get(item.product);
+        if (!product) {
+          throw createHttpError(400, `Product not found: ${item.product}`);
+        }
 
-    const totalAmount = orderItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-
-    let discount = 0;
-    let normalizedCouponCode: string | undefined;
-
-    if (couponCode) {
-      const now = new Date();
-      normalizedCouponCode = couponCode.toUpperCase();
-      const appliedCoupon = await Coupon.findOne({
-        code: normalizedCouponCode,
-        isActive: true
+        return {
+          product: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity
+        };
       });
 
-      if (!appliedCoupon) {
-        res.status(404).json({ error: 'Coupon not found' });
-        return;
-      }
-
-      if (appliedCoupon.expiresAt && now > appliedCoupon.expiresAt) {
-        res.status(400).json({ error: 'Coupon has expired' });
-        return;
-      }
-
-      if (totalAmount < (appliedCoupon.minOrderAmount || 0)) {
-        res.status(400).json({
-          error: `Minimum order amount for this coupon is ${appliedCoupon.minOrderAmount}`
-        });
-        return;
-      }
-
-      if (appliedCoupon.discountType === 'percentage') {
-        discount = (totalAmount * appliedCoupon.discountValue) / 100;
-      } else {
-        discount = appliedCoupon.discountValue;
-      }
-
-      discount = Math.min(discount, totalAmount);
-
-      const couponUpdateResult = await Coupon.updateOne(
-        {
-          _id: appliedCoupon._id,
-          isActive: true,
-          usedCount: { $lt: appliedCoupon.maxUses },
-          $or: [
-            { expiresAt: { $exists: false } },
-            { expiresAt: null },
-            { expiresAt: { $gt: now } }
-          ]
-        },
-        { $inc: { usedCount: 1 } }
+      const totalAmount = orderItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
       );
 
-      if (couponUpdateResult.modifiedCount === 0) {
-        res.status(409).json({ error: 'Coupon usage limit reached' });
-        return;
+      let discount = 0;
+      let normalizedCouponCode: string | undefined;
+
+      if (couponCode) {
+        const now = new Date();
+        normalizedCouponCode = couponCode.toUpperCase();
+        const appliedCoupon = await Coupon.findOne({
+          code: normalizedCouponCode,
+          isActive: true
+        }).session(session);
+
+        if (!appliedCoupon) {
+          throw createHttpError(404, 'Coupon not found');
+        }
+
+        if (appliedCoupon.expiresAt && now > appliedCoupon.expiresAt) {
+          throw createHttpError(400, 'Coupon has expired');
+        }
+
+        if (totalAmount < (appliedCoupon.minOrderAmount || 0)) {
+          throw createHttpError(
+            400,
+            `Minimum order amount for this coupon is ${appliedCoupon.minOrderAmount}`
+          );
+        }
+
+        if (appliedCoupon.discountType === 'percentage') {
+          discount = (totalAmount * appliedCoupon.discountValue) / 100;
+        } else {
+          discount = appliedCoupon.discountValue;
+        }
+
+        discount = Math.min(discount, totalAmount);
+
+        const couponUpdateResult = await Coupon.updateOne(
+          {
+            _id: appliedCoupon._id,
+            isActive: true,
+            usedCount: { $lt: appliedCoupon.maxUses },
+            $or: [
+              { expiresAt: { $exists: false } },
+              { expiresAt: null },
+              { expiresAt: { $gt: now } }
+            ]
+          },
+          { $inc: { usedCount: 1 } },
+          { session }
+        );
+
+        if (couponUpdateResult.modifiedCount === 0) {
+          throw createHttpError(409, 'Coupon usage limit reached');
+        }
       }
-    }
 
-    const finalAmount = Math.max(totalAmount - discount, 0);
+      const finalAmount = Math.max(totalAmount - discount, 0);
 
-    const order = new Order({
-      user: userId,
-      items: orderItems,
-      totalAmount,
-      discount,
-      finalAmount,
-      email,
-      phone,
-      address,
-      couponCode: normalizedCouponCode
+      const order = new Order({
+        user: userId,
+        items: orderItems,
+        totalAmount,
+        discount,
+        finalAmount,
+        email,
+        phone,
+        address,
+        couponCode: normalizedCouponCode
+      });
+
+      createdOrder = await order.save({ session });
     });
-
-    await order.save();
 
     res.status(201).json({
       message: 'Order created successfully',
-      order
+      order: createdOrder
     });
   } catch (error) {
+    const statusCode = (error as HttpError).statusCode || 500;
     console.error('Create order error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(statusCode).json({
+      error: statusCode === 500 ? 'Server error' : (error as Error).message
+    });
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -204,17 +225,25 @@ export const reorder = async (req: AuthRequest, res: Response): Promise<void> =>
       return;
     }
 
-    const currentProducts = await Product.find({ _id: { $in: order.items.map(i => i.product) } });
-    const availableProductIds = new Set(currentProducts.map(p => p._id.toString()));
+    const currentProducts = await Product.find({ _id: { $in: order.items.map(i => i.product) } })
+      .populate('shop', 'name');
+    const currentProductMap = new Map(
+      currentProducts.map((product) => [product._id.toString(), product])
+    );
 
     const availableItems = order.items
-      .filter(item => availableProductIds.has(item.product.toString()))
-      .map(item => ({
-        product: item.product,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity
-      }));
+      .map((item) => {
+        const product = currentProductMap.get(item.product.toString());
+        if (!product) {
+          return null;
+        }
+
+        return {
+          product,
+          quantity: item.quantity
+        };
+      })
+      .filter((item): item is { product: (typeof currentProducts)[number]; quantity: number } => Boolean(item));
 
     if (availableItems.length === 0) {
       res.status(400).json({ error: 'No products available for reorder' });
