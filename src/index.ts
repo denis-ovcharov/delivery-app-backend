@@ -6,7 +6,6 @@ import dotenv from "dotenv";
 import { errorHandler } from "./middleware/errorHandler";
 import routes from "./routes";
 import connectDB from "./config/db";
-import { seedDatabase } from "./utils/seed";
 
 dotenv.config();
 
@@ -29,7 +28,6 @@ app.use(errorHandler);
 const startServer = async (): Promise<void> => {
   try {
     await connectDB();
-    await seedDatabase();
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
