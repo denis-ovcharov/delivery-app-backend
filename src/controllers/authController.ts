@@ -39,7 +39,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     res.status(201).json({
       message: 'Registration successful',
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, defaultAddress: user.defaultAddress }
     });
   } catch (error) {
     if ((error as { code?: number }).code === 11000) {
@@ -77,7 +77,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.json({
       message: 'Login successful',
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, defaultAddress: user.defaultAddress }
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
