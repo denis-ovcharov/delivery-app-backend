@@ -16,6 +16,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
         id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         defaultAddress: user.defaultAddress,
       },
     });
@@ -26,7 +27,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
 
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, defaultAddress } = req.body;
+    const { name, email, phone, defaultAddress } = req.body;
 
     const user = await User.findById(req.user?.userId);
 
@@ -37,6 +38,14 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
 
     if (name !== undefined) {
       user.name = name;
+    }
+
+    if (email !== undefined) {
+      user.email = email;
+    }
+
+    if (phone !== undefined) {
+      user.phone = phone;
     }
 
     if (defaultAddress !== undefined) {
@@ -51,6 +60,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
         id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         defaultAddress: user.defaultAddress,
       },
     });
